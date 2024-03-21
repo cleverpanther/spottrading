@@ -11,6 +11,7 @@ import resend
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import json
 
 httpClient=requests.Session()
 recv_window=str(5000)
@@ -32,7 +33,6 @@ def HTTP_Request(endPoint,method,payload,Info):
         response = httpClient.request(method, url+endPoint, headers=headers, data=payload)
     else:
         response = httpClient.request(method, url+endPoint+"?"+payload, headers=headers)
-    print(response.text)
     print(Info + " Elapsed Time : " + str(response.elapsed))
     return response.text
 
@@ -45,27 +45,28 @@ def genSignature(payload):
 def gatherdata():
     endpoint="/v5/market/tickers"
     method="GET"
-    params1='category=option&symbol=BTC-29MAR24-22000-C&side=Buy'
+    params1='category=option&symbol=BTC-29MAR24-48000-C&side=Sell'
     text1 = HTTP_Request(endpoint,method,params1,"UnFilled")
+    data1 = json.loads(text1)
+    Call_BidPrice = float(data1['result']['list'][0]['bid1Price'])
 
     endpoint="/v5/market/tickers"
     method="GET"
-    params1='category=option&symbol=BTC-29MAR24-26000-P&side=Sell'
+    params1='category=option&symbol=BTC-29MAR24-48000-P&side=Buy'
     text2 = HTTP_Request(endpoint,method,params1,"UnFilled")
+    data2 = json.loads(text2)
+    Put_AskPrice = float(data2['result']['list'][0]['ask1Price'])
 
     endpoint="/v5/market/tickers"
     method="GET"
     params1='category=linear&symbol=BTCUSDT'
     text3 = HTTP_Request(endpoint,method,params1,"UnFilled")
+    data3 = json.loads(text3)
+    Perp_AskPrice = float(data3['result']['list'][0]['ask1Price'])
     
-    endpoint="/v5/market/tickers"
-    method="GET"
-    params1='category=linear&symbol=BTCPERP'
-    text4 = HTTP_Request(endpoint,method,params1,"UnFilled")
+    Profitability = (Call_BidPrice - Put_AskPrice) - (Perp_AskPrice - 48000)
     
-    totaltext = '<p>' + text1 + '</p><p>' + text2 + '</p><p>' + text3 + '</p><p>' + text4 + '</p>'
-    
-    return totaltext
+    return Profitability
 
 # # Email configuration
 # sender_email = "titanrtx0714@outlook.com"
@@ -79,12 +80,20 @@ secret_key ='y90nFfUgTEUFoDsXHpkduxw4cxrOQjvbfApI'
 def send_email(subject, body):
     resend.api_key = "re_enoinqaw_Dhxn8mSSK3wkD25SfaZV2jhK"
 
-    r = resend.Emails.send({
-    "from": "onboarding@resend.dev",
-    "to": "titanrtx0714@gmail.com",
-    "subject": subject,
-    "html": body
-    })
+    if body > 500:
+        r = resend.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": "titanrtx0714@gmail.com",
+            "subject": subject,
+            "html": "Good Situation: " + str(body)
+            })
+    else:
+        r = resend.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": "titanrtx0714@gmail.com",
+            "subject": subject,
+            "html": "Bad Situation: " + str(body)
+            })
 
     # # Create a multipart message
     # message = MIMEMultipart()
@@ -104,6 +113,7 @@ def send_email(subject, body):
 # Loop to send email every 1 minute
 while True:
     body = gatherdata()
+    print(body)
     send_email(subject=subject, body=body)
     print("Email sent successfully.")
-    time.sleep(60)  # Sleep for 60 seconds (1 minute)
+    time.sleep(10)  # Sleep for 60 seconds (1 minute)
